@@ -1,19 +1,24 @@
-# PGDN Publisher
+# PGDN Publish
 
 A pure Python library for publishing DePIN scan results to blockchain ledgers and reports.
 
 ## Installation
 
 ```bash
-cd lib
+cd pgdn-publish
 pip install -e .
+```
+
+Or install from PyPI (once published):
+```bash
+pip install pgdn-publish
 ```
 
 ## Usage
 
 ### Library
 ```python
-from pgdn_publisher import publish_to_ledger, publish_report
+from pgdn_publish import publish_to_ledger, publish_report
 
 # Publish to ledger
 result = publish_to_ledger(scan_data)
@@ -25,7 +30,7 @@ results = publish_report(scan_data)
 ### CLI
 ```bash
 # Use the JSON CLI
-python lib/cli.py ledger --scan-data '{"host_uid": "test", "trust_score": 85}'
+pgdn-publish ledger --scan-data '{"host_uid": "test", "trust_score": 85}'
 ```
 
 ## Configuration
@@ -37,7 +42,8 @@ Set environment variables:
 
 ## Structure
 
-- `lib/pgdn_publisher/` - Core library
-- `lib/cli.py` - JSON CLI interface
-- `lib/contracts/` - Smart contract ABIs
-- `requirements.txt` - Basic dependencies
+- `pgdn-publish/` - Main package directory
+- `pgdn-publish/pgdn_publish/` - Core library
+- `pgdn-publish/pgdn_publish/cli.py` - JSON CLI interface 
+- `pgdn-publish/contracts/` - Smart contract ABIs
+- `pgdn-publish/setup.py` - Package installation configuration
