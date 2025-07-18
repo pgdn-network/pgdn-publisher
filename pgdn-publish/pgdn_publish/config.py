@@ -6,6 +6,12 @@ import os
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 
+try:
+    from dotenv import load_dotenv, find_dotenv
+    _DOTENV_AVAILABLE = True
+except ImportError:
+    _DOTENV_AVAILABLE = False
+
 
 @dataclass
 class PublisherConfig:
@@ -26,8 +32,23 @@ class PublisherConfig:
     reports_dir: str = "reports"
     
     @classmethod
-    def from_env(cls) -> 'PublisherConfig':
-        """Create configuration from environment variables."""
+    def from_env(cls, env_file: Optional[str] = None) -> 'PublisherConfig':
+        """
+        Create configuration from environment variables.
+        
+        Args:
+            env_file: Path to .env file to load. If None, looks for .env in current directory and parent directories.
+        """
+        # Load .env file if available
+        if _DOTENV_AVAILABLE:
+            if env_file:
+                load_dotenv(env_file)
+            else:
+                # Look for .env file in current directory and parent directories
+                env_path = find_dotenv()
+                if env_path:
+                    load_dotenv(env_path)
+        
         return cls(
             rpc_url=os.getenv('ZKSYNC_RPC_URL', cls.rpc_url),
             contract_address=os.getenv('CONTRACT_ADDRESS'),
@@ -36,7 +57,7 @@ class PublisherConfig:
             gas_price_gwei=float(os.getenv('GAS_PRICE_GWEI', cls.gas_price_gwei)),
             walrus_api_url=os.getenv('WALRUS_API_URL', cls.walrus_api_url),
             walrus_api_key=os.getenv('WALRUS_API_KEY'),
-            reports_dir=os.getenv('REPORTS_DIR', cls.reports_dir)
+            reports_dir=os.getenv('REPORTS_OUTPUT_DIR', os.getenv('REPORTS_DIR', cls.reports_dir))
         )
     
     def validate(self) -> None:

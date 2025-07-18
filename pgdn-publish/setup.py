@@ -18,6 +18,9 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/pgdn-network/pgdn-publisher",
     packages=find_packages(),
+    package_data={
+        'pgdn_publish': ['contracts/ledger/*.json'],
+    },
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
@@ -37,6 +40,7 @@ setup(
         "web3>=6.0.0",
         "eth-account>=0.8.0",
         "requests>=2.25.0",
+        "python-dotenv>=0.19.0",
     ],
     extras_require={
         "dev": [

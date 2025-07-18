@@ -103,22 +103,24 @@ pgdn-publisher retrieve --walrus-hash "abc123def456"
 
 ## Configuration
 
-Set these environment variables:
+The library automatically loads configuration from `.env` files. Create a `.env` file in your project root:
 
 ```bash
 # Blockchain configuration (required)
-export CONTRACT_ADDRESS="0x1234567890abcdef..."
-export PRIVATE_KEY="0xabcdef1234567890..."
-export ZKSYNC_RPC_URL="https://sepolia.era.zksync.dev"
+CONTRACT_ADDRESS="0x1234567890abcdef..."
+PRIVATE_KEY="0xabcdef1234567890..."
+ZKSYNC_RPC_URL="https://sepolia.era.zksync.dev"
 
-# Walrus configuration (optional)
-export WALRUS_API_KEY="your-walrus-api-key"
-export WALRUS_API_URL="https://publisher-devnet.walrus.space"
+# Walrus storage (optional)  
+WALRUS_API_KEY="your-walrus-api-key"
+WALRUS_API_URL="https://publisher-devnet.walrus.space"
 
-# Optional configuration
-export GAS_LIMIT="10000000"
-export GAS_PRICE_GWEI="0.25"
-export REPORTS_DIR="./reports"
+# Report output (optional)
+REPORTS_OUTPUT_DIR="./reports"
+
+# Gas settings (optional)
+GAS_LIMIT="10000000"
+GAS_PRICE_GWEI="0.25"
 ```
 
 ## Library Classes

@@ -5,6 +5,7 @@ Blockchain ledger publishing functionality.
 import json
 import time
 import os
+import importlib.resources
 from typing import Dict, Any, Optional
 from web3 import Web3
 from web3.contract import Contract
@@ -47,18 +48,29 @@ class LedgerPublisher:
         self._check_authorization()
     
     def _load_contract_abi(self) -> list:
-        """Load contract ABI from file."""
-        abi_paths = [
-            'contracts/ledger/abi.json',
-            '../contracts/ledger/abi.json',
-        ]
-        
-        for abi_path in abi_paths:
+        """Load contract ABI from package resources."""
+        try:
+            # Try to load from package resources first
             try:
-                with open(abi_path, 'r') as f:
+                with importlib.resources.open_text('pgdn_publish.contracts.ledger', 'abi.json') as f:
                     return json.load(f)
-            except FileNotFoundError:
-                continue
+            except (FileNotFoundError, ImportError):
+                # Fallback to file system for development
+                abi_paths = [
+                    'contracts/ledger/abi.json',
+                    '../contracts/ledger/abi.json',
+                    'pgdn_publish/contracts/ledger/abi.json',
+                ]
+                
+                for abi_path in abi_paths:
+                    try:
+                        with open(abi_path, 'r') as f:
+                            return json.load(f)
+                    except FileNotFoundError:
+                        continue
+                        
+        except Exception as e:
+            raise LedgerError(f"Failed to load contract ABI: {e}")
         
         raise LedgerError("Contract ABI file not found")
     

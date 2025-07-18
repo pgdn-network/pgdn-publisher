@@ -35,10 +35,27 @@ pgdn-publish ledger --scan-data '{"host_uid": "test", "trust_score": 85}'
 
 ## Configuration
 
-Set environment variables:
-- `CONTRACT_ADDRESS` - Smart contract address
-- `PRIVATE_KEY` - Private key for publishing
-- `WALRUS_API_KEY` - Walrus storage API key (optional)
+Create a `.env` file in your project root or set environment variables:
+
+```bash
+# Blockchain configuration (required)
+CONTRACT_ADDRESS="0x1234567890abcdef..."
+PRIVATE_KEY="0xabcdef1234567890..."
+ZKSYNC_RPC_URL="https://sepolia.era.zksync.dev"
+
+# Walrus storage (optional)
+WALRUS_API_KEY="your-walrus-api-key"
+WALRUS_API_URL="https://publisher-devnet.walrus.space"
+
+# Report output (optional)
+REPORTS_OUTPUT_DIR="./reports"
+
+# Gas settings (optional)
+GAS_LIMIT="10000000"
+GAS_PRICE_GWEI="0.25"
+```
+
+The library will automatically load from a `.env` file in the current directory or parent directories.
 
 ## Structure
 
