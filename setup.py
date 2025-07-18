@@ -10,7 +10,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="pgdn-publish",
-    version="1.3.0",
+    version="1.4.0",
     author="PGDN Network",
     author_email="contact@pgdn.network",
     description="A pure Python library for publishing DePIN scan results to blockchain ledgers and reports",

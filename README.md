@@ -64,6 +64,9 @@ pgdn-publish report --scan-data '{"scan_id": 123, "trust_score": 85}'
 # Check connection status
 pgdn-publish status
 
+# Run comprehensive diagnostic tests
+pgdn-publish diagnose
+
 # Retrieve report from Walrus
 pgdn-publish retrieve --walrus-hash "abc123def456"
 ```

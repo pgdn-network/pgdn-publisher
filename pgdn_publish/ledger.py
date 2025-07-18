@@ -23,7 +23,7 @@ class LedgerError(Exception):
 class LedgerPublisher:
     """Publisher for blockchain ledger operations."""
     
-    def __init__(self, config: PublisherConfig):
+    def __init__(self, config: PublisherConfig, skip_auth_check: bool = False):
         """Initialize ledger publisher."""
         self.config = config
         self.config.validate()
@@ -44,8 +44,9 @@ class LedgerPublisher:
             abi=self.contract_abi
         )
         
-        # Check authorization
-        self._check_authorization()
+        # Check authorization (can be skipped for diagnostic purposes)
+        if not skip_auth_check:
+            self._check_authorization()
     
     def _load_contract_abi(self) -> list:
         """Load contract ABI from package resources."""
@@ -77,16 +78,29 @@ class LedgerPublisher:
     def _check_authorization(self):
         """Check if account is authorized to publish."""
         try:
+            # First, verify that the contract exists and has code
+            contract_code = self.w3.eth.get_code(self.contract_address)
+            if contract_code == b'\x00' or len(contract_code) == 0:
+                raise LedgerError(f"No contract deployed at address {self.contract_address}")
+            
             # Check if account is owner
-            owner = self.contract.functions.owner().call()
-            self.is_owner = self.account.address.lower() == owner.lower()
+            try:
+                owner = self.contract.functions.owner().call()
+                self.is_owner = self.account.address.lower() == owner.lower()
+            except Exception as e:
+                raise LedgerError(f"Failed to call owner() function: {e}. Contract may not implement Ownable interface.")
             
             # Check if account is authorized publisher
-            self.is_publisher = self.contract.functions.authorizedPublishers(self.account.address).call()
+            try:
+                self.is_publisher = self.contract.functions.authorizedPublishers(self.account.address).call()
+            except Exception as e:
+                raise LedgerError(f"Failed to call authorizedPublishers() function: {e}. Contract may not implement publisher authorization.")
             
             if not (self.is_owner or self.is_publisher):
-                raise LedgerError(f"Account {self.account.address} not authorized to publish")
+                raise LedgerError(f"Account {self.account.address} not authorized to publish. Owner: {self.is_owner}, Publisher: {self.is_publisher}")
                 
+        except LedgerError:
+            raise
         except Exception as e:
             raise LedgerError(f"Authorization check failed: {e}")
     
@@ -266,6 +280,136 @@ class LedgerPublisher:
                 'error': str(e)
             }
 
+    def diagnose_connection(self) -> Dict[str, Any]:
+        """Comprehensive diagnostic information for debugging connection issues."""
+        diagnostics = {
+            'timestamp': time.time(),
+            'config': {
+                'rpc_url': self.config.rpc_url,
+                'contract_address': self.contract_address,
+                'account_address': self.account.address,
+                'gas_limit': self.config.gas_limit,
+                'gas_price_gwei': self.config.gas_price_gwei
+            },
+            'tests': {}
+        }
+        
+        # Test 1: RPC Connection
+        try:
+            is_connected = self.w3.is_connected()
+            latest_block = self.w3.eth.block_number if is_connected else None
+            chain_id = self.w3.eth.chain_id if is_connected else None
+            
+            diagnostics['tests']['rpc_connection'] = {
+                'success': is_connected,
+                'latest_block': latest_block,
+                'chain_id': chain_id,
+                'error': None if is_connected else 'RPC connection failed'
+            }
+        except Exception as e:
+            diagnostics['tests']['rpc_connection'] = {
+                'success': False,
+                'error': str(e)
+            }
+        
+        # Test 2: Account Balance
+        try:
+            balance = self.w3.eth.get_balance(self.account.address)
+            diagnostics['tests']['account_balance'] = {
+                'success': True,
+                'balance_wei': balance,
+                'balance_eth': float(self.w3.from_wei(balance, 'ether')),
+                'error': None
+            }
+        except Exception as e:
+            diagnostics['tests']['account_balance'] = {
+                'success': False,
+                'error': str(e)
+            }
+        
+        # Test 3: Contract Existence
+        try:
+            contract_code = self.w3.eth.get_code(self.contract_address)
+            has_code = len(contract_code) > 0 and contract_code != b'\x00'
+            
+            diagnostics['tests']['contract_existence'] = {
+                'success': has_code,
+                'has_code': has_code,
+                'code_size': len(contract_code),
+                'error': None if has_code else 'No contract code at specified address'
+            }
+        except Exception as e:
+            diagnostics['tests']['contract_existence'] = {
+                'success': False,
+                'error': str(e)
+            }
+        
+        # Test 4: Contract Interface
+        try:
+            # Test basic contract calls
+            tests = {}
+            
+            # Test owner() function
+            try:
+                owner = self.contract.functions.owner().call()
+                tests['owner'] = {'success': True, 'value': owner}
+            except Exception as e:
+                tests['owner'] = {'success': False, 'error': str(e)}
+            
+            # Test authorizedPublishers() function
+            try:
+                is_publisher = self.contract.functions.authorizedPublishers(self.account.address).call()
+                tests['authorized_publishers'] = {'success': True, 'value': is_publisher}
+            except Exception as e:
+                tests['authorized_publishers'] = {'success': False, 'error': str(e)}
+            
+            # Test getContractInfo() function if available
+            try:
+                if hasattr(self.contract.functions, 'getContractInfo'):
+                    info = self.contract.functions.getContractInfo().call()
+                    tests['contract_info'] = {'success': True, 'value': info}
+                else:
+                    tests['contract_info'] = {'success': False, 'error': 'Function not available'}
+            except Exception as e:
+                tests['contract_info'] = {'success': False, 'error': str(e)}
+            
+            diagnostics['tests']['contract_interface'] = {
+                'success': any(test['success'] for test in tests.values()),
+                'function_tests': tests
+            }
+            
+        except Exception as e:
+            diagnostics['tests']['contract_interface'] = {
+                'success': False,
+                'error': str(e)
+            }
+        
+        # Test 5: Authorization
+        try:
+            self._check_authorization()
+            diagnostics['tests']['authorization'] = {
+                'success': True,
+                'is_owner': getattr(self, 'is_owner', False),
+                'is_publisher': getattr(self, 'is_publisher', False),
+                'error': None
+            }
+        except Exception as e:
+            diagnostics['tests']['authorization'] = {
+                'success': False,
+                'error': str(e)
+            }
+        
+        # Overall status
+        all_tests = diagnostics['tests']
+        diagnostics['overall_status'] = {
+            'healthy': all(test.get('success', False) for test in all_tests.values()),
+            'total_tests': len(all_tests),
+            'passed_tests': sum(1 for test in all_tests.values() if test.get('success', False)),
+            'failed_tests': sum(1 for test in all_tests.values() if not test.get('success', False))
+        }
+        
+        return diagnostics
+
 
 def publish_to_ledger(scan_result: Dict[str, Any], config: Optional[PublisherConfig] = None) -> Dict[str, Any]:
     """
@@ -283,3 +427,32 @@ def publish_to_ledger(scan_result: Dict[str, Any], config: Optional[PublisherCon
     
     publisher = LedgerPublisher(config)
     return publisher.publish(scan_result)
+
+
+def diagnose_ledger_connection(config: Optional[PublisherConfig] = None) -> Dict[str, Any]:
+    """
+    Diagnose ledger connection issues without performing authorization checks.
+    
+    Args:
+        config: Publisher configuration (defaults to environment config)
+    
+    Returns:
+        Diagnostic information dictionary
+    """
+    if config is None:
+        config = PublisherConfig.from_env()
+    
+    try:
+        # Create publisher without authorization check for diagnostic purposes
+        publisher = LedgerPublisher(config, skip_auth_check=True)
+        return publisher.diagnose_connection()
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"Failed to create diagnostic connection: {e}",
+            'config': {
+                'rpc_url': config.rpc_url,
+                'contract_address': config.contract_address,
+                'account_address': 'unknown'
+            }
+        }

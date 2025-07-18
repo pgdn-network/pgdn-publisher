@@ -15,6 +15,7 @@ try:
     from . import (
         publish_to_ledger, 
         publish_report, 
+        diagnose_ledger_connection,
         LedgerPublisher, 
         ReportPublisher, 
         PublisherConfig
@@ -45,6 +46,9 @@ Examples:
   
   # Check ledger status
   pgdn-publish status
+  
+  # Run diagnostic tests
+  pgdn-publish diagnose
   
   # Retrieve report from Walrus
   pgdn-publish retrieve --walrus-hash "abc123def456"
@@ -83,6 +87,9 @@ Examples:
     
     # Status command
     subparsers.add_parser('status', help='Check ledger connection status')
+    
+    # Diagnose command
+    subparsers.add_parser('diagnose', help='Run comprehensive diagnostic tests for ledger connection')
     
     # Retrieve command
     retrieve_parser = subparsers.add_parser('retrieve', help='Retrieve report from Walrus')
@@ -194,6 +201,25 @@ def handle_status_command(config: PublisherConfig) -> Dict[str, Any]:
         }
 
 
+def handle_diagnose_command(config: PublisherConfig) -> Dict[str, Any]:
+    """Handle diagnose command."""
+    try:
+        diagnostics = diagnose_ledger_connection(config)
+        
+        return {
+            "success": True,
+            "command": "diagnose",
+            "diagnostics": diagnostics
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "command": "diagnose",
+            "error": str(e)
+        }
+
+
 def handle_retrieve_command(args, config: PublisherConfig) -> Dict[str, Any]:
     """Handle retrieve command."""
     try:
@@ -251,6 +277,8 @@ def main():
             result = handle_report_command(args, config)
         elif args.command == 'status':
             result = handle_status_command(config)
+        elif args.command == 'diagnose':
+            result = handle_diagnose_command(config)
         elif args.command == 'retrieve':
             result = handle_retrieve_command(args, config)
         else:
