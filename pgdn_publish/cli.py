@@ -20,6 +20,7 @@ try:
         ReportPublisher, 
         PublisherConfig
     )
+    from .network_factory import create_ledger_publisher, get_supported_networks
 except ImportError:
     print(json.dumps({
         "success": False,
@@ -35,8 +36,11 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Publish scan to ledger
+  # Publish scan to ledger (default ZKSync)
   pgdn-publish ledger --scan-data '{"host_uid": "validator_123", "trust_score": 85}'
+  
+  # Publish scan to SUI ledger
+  pgdn-publish ledger --scan-data '{"host_uid": "validator_123", "trust_score": 85}' --network sui
   
   # Publish scan report
   pgdn-publish report --scan-data '{"scan_id": 123, "trust_score": 85}'
@@ -44,10 +48,12 @@ Examples:
   # Publish report to specific destinations
   pgdn-publish report --scan-data '{"scan_id": 123}' --destinations walrus local_file
   
-  # Check ledger status
-  pgdn-publish status
+  # Check ledger status for different networks
+  pgdn-publish status --network zksync
+  pgdn-publish status --network sui
   
   # Run diagnostic tests
+  pgdn-publish diagnose --network zksync
   pgdn-publish diagnose
   
   # Retrieve report from Walrus
@@ -101,6 +107,12 @@ Examples:
     
     # Global configuration options
     parser.add_argument(
+        '--network',
+        choices=get_supported_networks(),
+        default='zksync',
+        help='Blockchain network to use (default: zksync)'
+    )
+    parser.add_argument(
         '--config-file',
         help='Path to configuration file (JSON format)'
     )
@@ -121,15 +133,29 @@ def handle_ledger_command(args, config: PublisherConfig) -> Dict[str, Any]:
     try:
         scan_data = load_scan_data(args.scan_data)
         
+        # Create network-specific ledger publisher
+        publisher = create_ledger_publisher(args.network, config)
+        
+        # Extract required fields with fallbacks
+        host_uid = scan_data.get('host_uid') or scan_data.get('validator_id', 'unknown_host')
+        trust_score = int(scan_data.get('trust_score', 0))
+        
+        # Generate data hash from scan data
+        import hashlib
+        data_hash = hashlib.sha256(json.dumps(scan_data, sort_keys=True).encode()).hexdigest()
+        
         # Publish to ledger
-        result = publish_to_ledger(
-            scan_data, 
-            config
+        result = publisher.publish_scan(
+            host_uid=host_uid,
+            trust_score=trust_score,
+            data_hash=data_hash,
+            timestamp=scan_data.get('scan_time')
         )
         
         return {
             "success": True,
             "command": "ledger",
+            "network": args.network,
             "result": result
         }
         
@@ -137,6 +163,7 @@ def handle_ledger_command(args, config: PublisherConfig) -> Dict[str, Any]:
         return {
             "success": False,
             "command": "ledger",
+            "network": args.network,
             "error": str(e)
         }
 
@@ -181,15 +208,16 @@ def handle_report_command(args, config: PublisherConfig) -> Dict[str, Any]:
         }
 
 
-def handle_status_command(config: PublisherConfig) -> Dict[str, Any]:
+def handle_status_command(args, config: PublisherConfig) -> Dict[str, Any]:
     """Handle status command."""
     try:
-        publisher = LedgerPublisher(config)
+        publisher = create_ledger_publisher(args.network, config)
         status = publisher.get_status()
         
         return {
             "success": True,
             "command": "status",
+            "network": args.network,
             "status": status
         }
         
@@ -197,18 +225,21 @@ def handle_status_command(config: PublisherConfig) -> Dict[str, Any]:
         return {
             "success": False,
             "command": "status",
+            "network": args.network,
             "error": str(e)
         }
 
 
-def handle_diagnose_command(config: PublisherConfig) -> Dict[str, Any]:
+def handle_diagnose_command(args, config: PublisherConfig) -> Dict[str, Any]:
     """Handle diagnose command."""
     try:
-        diagnostics = diagnose_ledger_connection(config)
+        publisher = create_ledger_publisher(args.network, config, skip_auth_check=True)
+        diagnostics = publisher.diagnose_connection()
         
         return {
             "success": True,
             "command": "diagnose",
+            "network": args.network,
             "diagnostics": diagnostics
         }
         
@@ -216,6 +247,7 @@ def handle_diagnose_command(config: PublisherConfig) -> Dict[str, Any]:
         return {
             "success": False,
             "command": "diagnose",
+            "network": args.network,
             "error": str(e)
         }
 
@@ -262,7 +294,7 @@ def main():
         
         # Load configuration
         try:
-            config = PublisherConfig.from_env()
+            config = PublisherConfig.from_env(network=args.network)
         except Exception as e:
             print(json.dumps({
                 "success": False,
@@ -276,9 +308,9 @@ def main():
         elif args.command == 'report':
             result = handle_report_command(args, config)
         elif args.command == 'status':
-            result = handle_status_command(config)
+            result = handle_status_command(args, config)
         elif args.command == 'diagnose':
-            result = handle_diagnose_command(config)
+            result = handle_diagnose_command(args, config)
         elif args.command == 'retrieve':
             result = handle_retrieve_command(args, config)
         else:
