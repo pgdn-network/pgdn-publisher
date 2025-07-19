@@ -5,7 +5,7 @@ A pure Python library for publishing DePIN (Decentralized Physical Infrastructur
 scan results to blockchain ledgers and report storage systems.
 """
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 
 from .ledger import publish_to_ledger, diagnose_ledger_connection, LedgerPublisher, LedgerError
 from .reports import publish_report, ReportPublisher

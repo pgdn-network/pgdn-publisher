@@ -88,8 +88,21 @@ class PublisherConfig:
             if not self.private_key:
                 raise ValueError("PRIVATE_KEY is required for ZKSync network")
         elif self.network == 'sui':
-            # TODO: Add SUI-specific validation when implemented
-            pass
+            # Check for SUI-specific environment variables
+            package_id = os.getenv('PACKAGE_ID')
+            ledger_id = os.getenv('LEDGER_ID')
+            publisher_cap_id = os.getenv('PUBLISHER_CAP_ID')
+            
+            missing = []
+            if not package_id:
+                missing.append('PACKAGE_ID')
+            if not ledger_id:
+                missing.append('LEDGER_ID')
+            if not publisher_cap_id:
+                missing.append('PUBLISHER_CAP_ID')
+            
+            if missing:
+                raise ValueError(f"SUI network requires these environment variables: {', '.join(missing)}")
         else:
             raise ValueError(f"Unsupported network: {self.network}")
     
