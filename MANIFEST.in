@@ -1,2 +1,0 @@
-include pgdn_publish/contracts/ledger/abi.json
-recursive-include pgdn_publish/contracts *.json

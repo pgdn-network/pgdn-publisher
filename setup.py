@@ -1,32 +1,33 @@
-#!/usr/bin/env python3
 """
-Setup script for PGDN Publisher library.
+Setup script for PGDN Publisher
 """
 
 from setuptools import setup, find_packages
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+# Read requirements from requirements.txt
+def read_requirements():
+    with open('requirements.txt', 'r') as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith('#')]
 
 setup(
-    name="pgdn-publish",
-    version="1.6.0",
-    author="PGDN Network",
-    author_email="contact@pgdn.network",
-    description="A pure Python library for publishing DePIN scan results to blockchain ledgers and reports",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    url="https://github.com/pgdn-network/pgdn-publisher",
-    packages=find_packages(),
-    package_data={
-        'pgdn_publish': ['contracts/ledger/*.json'],
+    name="pgdn-publisher",
+    version="1.5.0",
+    description="PGDN Publisher - DePIN scan result publishing library",
+    long_description="A clean library for publishing DePIN scan results to blockchain ledgers and report storage.",
+    author="PGDN Team",
+    author_email="",
+    url="",
+    packages=['pgdn_publisher'],
+    py_modules=['cli', '__main__'],
+    install_requires=read_requirements(),
+    entry_points={
+        'console_scripts': [
+            'pgdn-publisher=cli:main',
+        ],
     },
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
-        "Topic :: Software Development :: Libraries :: Python Modules",
-        "Topic :: Security",
-        "Topic :: System :: Networking :: Monitoring",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",
@@ -36,26 +37,4 @@ setup(
         "Programming Language :: Python :: 3.12",
     ],
     python_requires=">=3.8",
-    install_requires=[
-        "web3>=6.0.0",
-        "eth-account>=0.8.0",
-        "requests>=2.25.0",
-        "python-dotenv>=0.19.0",
-    ],
-    extras_require={
-        "dev": [
-            "pytest>=6.0",
-            "pytest-cov",
-            "black",
-            "flake8",
-            "mypy",
-        ],
-    },
-    entry_points={
-        "console_scripts": [
-            "pgdn-publish=pgdn_publish.cli:main",
-        ],
-    },
-    include_package_data=True,
-    zip_safe=False,
 )

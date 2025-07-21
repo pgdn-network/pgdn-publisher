@@ -1,18 +1,19 @@
 """
-PGDN Publish Library
+PGDN Publisher Library
 
 A pure Python library for publishing DePIN scan results to blockchain ledgers and reports.
 """
 
-from .ledger import publish_to_ledger, LedgerPublisher
+from .ledger import publish_to_ledger, LedgerPublisher, create_ledger_publisher
 from .reports import publish_report, ReportPublisher
 from .config import PublisherConfig
 
-__version__ = "1.2.0"
+__version__ = "1.0.0"
 __all__ = [
     "publish_to_ledger",
     "publish_report", 
     "LedgerPublisher",
     "ReportPublisher",
-    "PublisherConfig"
+    "PublisherConfig",
+    "create_ledger_publisher"
 ]

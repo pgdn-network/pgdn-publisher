@@ -9,18 +9,29 @@ Returns only JSON output.
 import json
 import sys
 import argparse
+import os
 from typing import Dict, Any
 
+def load_env():
+    """Load environment variables from .env file if it exists."""
+    try:
+        with open('.env', 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key] = value
+    except FileNotFoundError:
+        pass  # .env file is optional
+
 try:
-    from . import (
+    from pgdn_publisher import (
         publish_to_ledger, 
         publish_report, 
-        diagnose_ledger_connection,
         LedgerPublisher, 
         ReportPublisher, 
         PublisherConfig
     )
-    from .network_factory import create_ledger_publisher, get_supported_networks
 except ImportError:
     print(json.dumps({
         "success": False,
@@ -36,29 +47,32 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Publish scan to ledger (default ZKSync)
-  pgdn-publish ledger --scan-data '{"host_uid": "validator_123", "trust_score": 85}'
+  # Publish scan to zkSync ledger
+  pgdn-publisher ledger --network zksync --scan-data '{"host_uid": "validator_123", "trust_score": 85, "summary_hash": "0x..."}'
   
   # Publish scan to SUI ledger
-  pgdn-publish ledger --scan-data '{"host_uid": "validator_123", "trust_score": 85}' --network sui
+  pgdn-publisher ledger --network sui --scan-data '{"host_uid": "validator_123", "trust_score": 85, "summary_hash": "abc123"}'
   
   # Publish scan report
-  pgdn-publish report --scan-data '{"scan_id": 123, "trust_score": 85}'
+  pgdn-publisher report --scan-data '{"scan_id": 123, "trust_score": 85}'
   
-  # Publish report to specific destinations
-  pgdn-publish report --scan-data '{"scan_id": 123}' --destinations walrus local_file
-  
-  # Check ledger status for different networks
-  pgdn-publish status --network zksync
-  pgdn-publish status --network sui
-  
-  # Run diagnostic tests
-  pgdn-publish diagnose --network zksync
-  pgdn-publish diagnose
+  # Check SUI ledger status
+  pgdn-publisher status --network sui
   
   # Retrieve report from Walrus
-  pgdn-publish retrieve --walrus-hash "abc123def456"
+  pgdn-publisher retrieve --walrus-hash "abc123def456"
         """
+    )
+    
+    # Global configuration options
+    parser.add_argument(
+        '--config-file',
+        help='Path to configuration file (JSON format)'
+    )
+    parser.add_argument(
+        '--network',
+        choices=['zksync', 'sui'],
+        help='Blockchain network to use (overrides PGDN_NETWORK env var)'
     )
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
@@ -68,7 +82,7 @@ Examples:
     ledger_parser.add_argument(
         '--scan-data',
         required=True,
-        help='Scan data as JSON string'
+        help='Scan data as JSON string (must include summary_hash)'
     )
     ledger_parser.add_argument(
         '--no-wait',
@@ -94,27 +108,12 @@ Examples:
     # Status command
     subparsers.add_parser('status', help='Check ledger connection status')
     
-    # Diagnose command
-    subparsers.add_parser('diagnose', help='Run comprehensive diagnostic tests for ledger connection')
-    
     # Retrieve command
     retrieve_parser = subparsers.add_parser('retrieve', help='Retrieve report from Walrus')
     retrieve_parser.add_argument(
         '--walrus-hash',
         required=True,
         help='Walrus hash of the report to retrieve'
-    )
-    
-    # Global configuration options
-    parser.add_argument(
-        '--network',
-        choices=get_supported_networks(),
-        default='zksync',
-        help='Blockchain network to use (default: zksync)'
-    )
-    parser.add_argument(
-        '--config-file',
-        help='Path to configuration file (JSON format)'
     )
     
     return parser.parse_args()
@@ -133,29 +132,24 @@ def handle_ledger_command(args, config: PublisherConfig) -> Dict[str, Any]:
     try:
         scan_data = load_scan_data(args.scan_data)
         
-        # Create network-specific ledger publisher
-        publisher = create_ledger_publisher(args.network, config)
+        # Validate that summary_hash is present
+        if 'summary_hash' not in scan_data:
+            return {
+                "success": False,
+                "command": "ledger",
+                "error": "summary_hash is required in scan data"
+            }
         
-        # Extract required fields with fallbacks
-        host_uid = scan_data.get('host_uid') or scan_data.get('validator_id', 'unknown_host')
-        trust_score = int(scan_data.get('trust_score', 0))
+        # Set wait for confirmation based on flag
+        wait_for_confirmation = not args.no_wait
         
-        # Generate data hash from scan data
-        import hashlib
-        data_hash = hashlib.sha256(json.dumps(scan_data, sort_keys=True).encode()).hexdigest()
-        
-        # Publish to ledger
-        result = publisher.publish_scan(
-            host_uid=host_uid,
-            trust_score=trust_score,
-            data_hash=data_hash,
-            timestamp=scan_data.get('scan_time')
-        )
+        # Create publisher and publish
+        publisher = LedgerPublisher(config)
+        result = publisher.publish(scan_data, wait_for_confirmation=wait_for_confirmation)
         
         return {
             "success": True,
             "command": "ledger",
-            "network": args.network,
             "result": result
         }
         
@@ -163,7 +157,6 @@ def handle_ledger_command(args, config: PublisherConfig) -> Dict[str, Any]:
         return {
             "success": False,
             "command": "ledger",
-            "network": args.network,
             "error": str(e)
         }
 
@@ -208,16 +201,15 @@ def handle_report_command(args, config: PublisherConfig) -> Dict[str, Any]:
         }
 
 
-def handle_status_command(args, config: PublisherConfig) -> Dict[str, Any]:
+def handle_status_command(config: PublisherConfig) -> Dict[str, Any]:
     """Handle status command."""
     try:
-        publisher = create_ledger_publisher(args.network, config)
+        publisher = LedgerPublisher(config)
         status = publisher.get_status()
         
         return {
             "success": True,
             "command": "status",
-            "network": args.network,
             "status": status
         }
         
@@ -225,29 +217,6 @@ def handle_status_command(args, config: PublisherConfig) -> Dict[str, Any]:
         return {
             "success": False,
             "command": "status",
-            "network": args.network,
-            "error": str(e)
-        }
-
-
-def handle_diagnose_command(args, config: PublisherConfig) -> Dict[str, Any]:
-    """Handle diagnose command."""
-    try:
-        publisher = create_ledger_publisher(args.network, config, skip_auth_check=True)
-        diagnostics = publisher.diagnose_connection()
-        
-        return {
-            "success": True,
-            "command": "diagnose",
-            "network": args.network,
-            "diagnostics": diagnostics
-        }
-        
-    except Exception as e:
-        return {
-            "success": False,
-            "command": "diagnose",
-            "network": args.network,
             "error": str(e)
         }
 
@@ -283,6 +252,9 @@ def handle_retrieve_command(args, config: PublisherConfig) -> Dict[str, Any]:
 def main():
     """Main CLI entry point."""
     try:
+        # Load .env file first
+        load_env()
+        
         args = parse_arguments()
         
         if not args.command:
@@ -308,9 +280,7 @@ def main():
         elif args.command == 'report':
             result = handle_report_command(args, config)
         elif args.command == 'status':
-            result = handle_status_command(args, config)
-        elif args.command == 'diagnose':
-            result = handle_diagnose_command(args, config)
+            result = handle_status_command(config)
         elif args.command == 'retrieve':
             result = handle_retrieve_command(args, config)
         else:
