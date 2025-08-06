@@ -10,12 +10,9 @@ from web3 import Web3
 from web3.contract import Contract
 from web3.exceptions import ContractLogicError
 from eth_account import Account
-try:
-    from importlib.resources import files
-except ImportError:
-    from importlib_resources import files
 
 from .config import PublisherConfig
+from .contract_abi import CONTRACT_ABI
 
 
 class ZkSyncLedgerError(Exception):
@@ -51,36 +48,8 @@ class ZkSyncLedgerPublisher:
         self._check_authorization()
     
     def _load_contract_abi(self) -> list:
-        """Load contract ABI from file."""
-        # Try to load from package resources first
-        try:
-            # Use importlib.resources to load from package data
-            package_files = files('pgdn_publisher') / '..' / 'contracts' / 'ledger' / 'abi.json'
-            with package_files.open('r') as f:
-                return json.load(f)
-        except (FileNotFoundError, ModuleNotFoundError, AttributeError):
-            pass
-        
-        # Fallback to file system paths
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(current_dir)
-        
-        abi_paths = [
-            os.path.join(project_root, 'contracts', 'ledger', 'abi.json'),
-            os.path.join(current_dir, '..', 'contracts', 'ledger', 'abi.json'),
-            'contracts/ledger/abi.json',
-            '../contracts/ledger/abi.json',
-            'lib/contracts/ledger/abi.json',
-        ]
-        
-        for abi_path in abi_paths:
-            try:
-                with open(abi_path, 'r') as f:
-                    return json.load(f)
-            except FileNotFoundError:
-                continue
-        
-        raise ZkSyncLedgerError(f"Contract ABI file not found. Searched paths: {abi_paths}")
+        """Load contract ABI from embedded data."""
+        return CONTRACT_ABI
     
     def _check_authorization(self):
         """Check if account is authorized to publish."""

@@ -11,17 +11,13 @@ def read_requirements():
 
 setup(
     name="pgdn-publisher",
-    version="1.5.3",
+    version="1.5.4",
     description="PGDN Publisher - DePIN scan result publishing library",
     long_description="A clean library for publishing DePIN scan results to blockchain ledgers and report storage.",
     author="PGDN Team",
     author_email="",
     url="",
     packages=['pgdn_publisher'],
-    package_data={
-        '': ['contracts/ledger/abi.json'],
-    },
-    include_package_data=True,
     py_modules=['cli', '__main__'],
     install_requires=read_requirements(),
     entry_points={
