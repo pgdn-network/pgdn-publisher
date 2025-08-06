@@ -48,7 +48,13 @@ class ZkSyncLedgerPublisher:
     
     def _load_contract_abi(self) -> list:
         """Load contract ABI from file."""
+        # Get the directory of this module
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        
         abi_paths = [
+            os.path.join(project_root, 'contracts', 'ledger', 'abi.json'),
+            os.path.join(current_dir, '..', 'contracts', 'ledger', 'abi.json'),
             'contracts/ledger/abi.json',
             '../contracts/ledger/abi.json',
             'lib/contracts/ledger/abi.json',
@@ -61,7 +67,7 @@ class ZkSyncLedgerPublisher:
             except FileNotFoundError:
                 continue
         
-        raise ZkSyncLedgerError("Contract ABI file not found")
+        raise ZkSyncLedgerError(f"Contract ABI file not found. Searched paths: {abi_paths}")
     
     def _check_authorization(self):
         """Check if account is authorized to publish."""
@@ -178,7 +184,15 @@ class ZkSyncLedgerPublisher:
             ledger_data = self._format_scan_for_ledger(scan_result)
             
             # Convert summary hash to bytes32
-            summary_hash_bytes = bytes.fromhex(ledger_data['summary_hash'][2:])
+            summary_hash_hex = ledger_data['summary_hash']
+            if summary_hash_hex.startswith('0x'):
+                summary_hash_hex = summary_hash_hex[2:]
+            
+            # Ensure exactly 64 characters for bytes32 (32 bytes * 2 chars per byte)
+            if len(summary_hash_hex) != 64:
+                raise ZkSyncLedgerError(f"summary_hash must be exactly 32 bytes (64 hex characters), got {len(summary_hash_hex)} characters")
+            
+            summary_hash_bytes = bytes.fromhex(summary_hash_hex)
             
             # Create function call
             function_call = self.contract.functions.publishScanSummary(
