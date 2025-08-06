@@ -11,7 +11,7 @@ def read_requirements():
 
 setup(
     name="pgdn-publisher",
-    version="1.5.2",
+    version="1.5.3",
     description="PGDN Publisher - DePIN scan result publishing library",
     long_description="A clean library for publishing DePIN scan results to blockchain ledgers and report storage.",
     author="PGDN Team",

@@ -10,7 +10,10 @@ from web3 import Web3
 from web3.contract import Contract
 from web3.exceptions import ContractLogicError
 from eth_account import Account
-import pkg_resources
+try:
+    from importlib.resources import files
+except ImportError:
+    from importlib_resources import files
 
 from .config import PublisherConfig
 
@@ -51,9 +54,11 @@ class ZkSyncLedgerPublisher:
         """Load contract ABI from file."""
         # Try to load from package resources first
         try:
-            abi_data = pkg_resources.resource_string(__name__.split('.')[0], 'contracts/ledger/abi.json')
-            return json.loads(abi_data.decode('utf-8'))
-        except (FileNotFoundError, ModuleNotFoundError, KeyError):
+            # Use importlib.resources to load from package data
+            package_files = files('pgdn_publisher') / '..' / 'contracts' / 'ledger' / 'abi.json'
+            with package_files.open('r') as f:
+                return json.load(f)
+        except (FileNotFoundError, ModuleNotFoundError, AttributeError):
             pass
         
         # Fallback to file system paths
