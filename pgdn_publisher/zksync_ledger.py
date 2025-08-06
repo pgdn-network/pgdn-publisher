@@ -10,6 +10,7 @@ from web3 import Web3
 from web3.contract import Contract
 from web3.exceptions import ContractLogicError
 from eth_account import Account
+import pkg_resources
 
 from .config import PublisherConfig
 
@@ -48,7 +49,14 @@ class ZkSyncLedgerPublisher:
     
     def _load_contract_abi(self) -> list:
         """Load contract ABI from file."""
-        # Get the directory of this module
+        # Try to load from package resources first
+        try:
+            abi_data = pkg_resources.resource_string(__name__.split('.')[0], 'contracts/ledger/abi.json')
+            return json.loads(abi_data.decode('utf-8'))
+        except (FileNotFoundError, ModuleNotFoundError, KeyError):
+            pass
+        
+        # Fallback to file system paths
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
         

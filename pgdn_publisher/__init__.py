@@ -8,7 +8,7 @@ from .ledger import publish_to_ledger, LedgerPublisher, create_ledger_publisher
 from .reports import publish_report, ReportPublisher
 from .config import PublisherConfig
 
-__version__ = "1.5.1"
+__version__ = "1.5.2"
 __all__ = [
     "publish_to_ledger",
     "publish_report", 
